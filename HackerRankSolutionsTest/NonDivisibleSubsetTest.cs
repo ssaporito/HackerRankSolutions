@@ -14,7 +14,7 @@ namespace HackerRankSolutionsTest
         public void TestByFiles(int k, string sString, int expected)
         {
             var s = sString.Split(' ').Select(x => Convert.ToInt32(x)).ToList();
-            var actual = NonDivisibleSubset.FindLongestSubset(k, s);
+            var actual = NonDivisibleSubset.LongestNonDivisibleSubset(k, s);
             Assert.Equal(expected, actual);
         }
 

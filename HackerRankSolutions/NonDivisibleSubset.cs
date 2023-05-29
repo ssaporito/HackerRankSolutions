@@ -2,116 +2,67 @@
 {
     public class NonDivisibleSubset
     {
-        public static int FindLongestSubset(int k, List<int> s)
+        static Dictionary<int, int> _modKValues;        
+        static Dictionary<int, List<int>> _nextCompatible;
+        static List<int> _mods;
+        static int _k;
+
+        public static int LongestNonDivisibleSubset(int k, List<int> s)
         {
-            var modKCounts = Enumerable.Repeat(0, k).ToList();
+            _k = k;
+            _modKValues = new Dictionary<int, int>();
+            _nextCompatible = new Dictionary<int, List<int>>();
+
             for (int i = 0; i < s.Count; i++)
             {
-                int modK = s[i] % k;
-                modKCounts[modK]++;
+                int m = s[i] % k;
+                if (!_modKValues.ContainsKey(m))
+                {
+                    _modKValues[m] = 0;
+                }
+                _modKValues[m]++;
             }
 
-            var allowedCombinations = GetAllowedCombinations(modKCounts);
-            var longestCount = FindLongestModPathCount(allowedCombinations, modKCounts);
-
-            return longestCount;
-        }
-
-        static int FindLongestModPathCount(List<HashSet<int>> allowedCombinations, List<int> modKCounts)
-        {
-            int k = modKCounts.Count;
-            int longestCount = 0;
-            var basePath = new ModPath(allowedCombinations, modKCounts);
-            var exploredPaths = new HashSet<string>();
-            for (int m = 0; m < modKCounts.Count; m++)
+            _mods = _modKValues.Keys.OrderBy(m => m).ToList();
+            for (int i = 0; i < _mods.Count - 1; i++)
             {
-                if (modKCounts[m] == 0) continue;
-                var mPath = new ModPath(basePath) { m };                
-                var range = Enumerable.Range(m, k - m);
-                var modStack = new Stack<ModPath>();
-                modStack.Push(mPath);
-                while (modStack.Any())
+                int m = _mods[i];
+                for (int j = i + 1; j < _mods.Count; j++)
                 {
-                    var path = modStack.Pop();
-                    if (exploredPaths.Contains(path.ToString()))
+                    int n = _mods[j];
+                    if ((m + n) % k != 0)
                     {
-                        Console.WriteLine("set already explored: " + path.ToString());
-                        continue;
-                    }
-                    Console.WriteLine("continuing path: " + path.ToString());
-                    var nextMods = range.Where(v => !path.Contains(v) && path.All(i => allowedCombinations[v].Contains(i)));
-
-                    foreach (var nextMod in nextMods)
-                    {
-                        var newPath = new ModPath(path) { nextMod };                        
-                        if (!exploredPaths.Contains(newPath.ToString()))
+                        if (!_nextCompatible.ContainsKey(m))
                         {
-                            modStack.Push(newPath);
+                            _nextCompatible[m] = new List<int>();
                         }
+                        _nextCompatible[m].Add(n);
                     }
-
-                    if (!nextMods.Any())
-                    {
-                        Console.WriteLine("finishing path: " + path.ToString());
-                        longestCount = Math.Max(path.Value, longestCount);
-                    }
-                    exploredPaths.Add(path.ToString());
                 }
-            }
-            return longestCount;
-        }
 
-        static List<HashSet<int>> GetAllowedCombinations(List<int> modKCounts)
-        {
-            int k = modKCounts.Count;
-            var result = Enumerable.Range(0, k).Select(x => new HashSet<int>()).ToList();
-            for (int i = 0; i < k; i++)
-            {
-                if (modKCounts[i] == 0) continue;
-                for (int j = i; j < k; j++)
+                if ((m + m) % k == 0)
                 {
-                    if (modKCounts[j] == 0) continue;
-                    if ((i + j) % k != 0)
-                    {
-                        result[i].Add(j);
-                        result[j].Add(i);
-                    }
+                    _modKValues[m] = 1;
                 }
-                Console.WriteLine("allowed for " + i + ": " + string.Join(' ', result[i]));
             }
-            return result;
+
+            return LongestNonDivisibleSubsetRecurse(_mods, 0);
         }
 
-        private class ModPath : SortedSet<int>
-        {
-            public int Value { get; set; }
-            private readonly List<HashSet<int>> _allowedCombinations;
-            private List<int> _modKCounts;
+        public static int LongestNonDivisibleSubsetRecurse(IEnumerable<int> availableMods, int count)
+        {                        
+            if (!availableMods.Any())
+                return count;
 
-            public ModPath(List<HashSet<int>> allowedCombinations, List<int> modKCounts) : base()
-            {
-                _allowedCombinations = allowedCombinations;
-                _modKCounts = modKCounts;
-            }
+            int m = availableMods.First();
+            int nextWithoutM = LongestNonDivisibleSubsetRecurse(availableMods.Skip(1), count);
 
-            public ModPath(ModPath path) : base(path)
-            {
-                Value = path.Value;
-                _allowedCombinations = path._allowedCombinations;
-                _modKCounts = path._modKCounts;
-            }
+            if (!_modKValues.ContainsKey(m))
+                return nextWithoutM;
 
-            public override string ToString()
-            {
-                return string.Join(' ', this);
-            }
-
-            public new bool Add(int m)
-            {
-                Value += _allowedCombinations[m].Contains(m) ? _modKCounts[m] : 1;
-                bool r = base.Add(m);
-                return r;
-            }
+            var nextCompatibleWithM = availableMods.Skip(1).Where(n => (n + m) % _k != 0);
+            int nextWithM = LongestNonDivisibleSubsetRecurse(nextCompatibleWithM, count + _modKValues[m]);
+            return Math.Max(nextWithM, nextWithoutM);
         }
     }
 }
