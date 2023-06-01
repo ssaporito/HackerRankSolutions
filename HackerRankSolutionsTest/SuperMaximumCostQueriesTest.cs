@@ -12,7 +12,7 @@ namespace HackerRankSolutionsTest
             var tree = treeString.Split("\r\n").Select(line => line.Split(' ').Select(s => Convert.ToInt32(s)).ToList()).ToList();
             var queries = queriesString.Split("\r\n").Select(line => line.Split(' ').Select(s => Convert.ToInt32(s)).ToList()).ToList();
             var expectedList = expectedString.Split("\r\n").Select(line => Convert.ToInt32(line)).ToList();
-            var actualList = SuperMaximumCostQueries.Solve(n, tree, queries);
+            var actualList = SuperMaximumCostQueries.Solve(tree, queries);
             var range = Enumerable.Range(0, expectedList.Count);
             var checks = range.Select(i => (Action)(() => Assert.Equal(expectedList[i], actualList[i]))).ToArray(); 
             Assert.Multiple(checks);            

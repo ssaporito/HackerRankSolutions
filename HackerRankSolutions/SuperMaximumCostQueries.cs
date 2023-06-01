@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,100 +11,162 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
 {
     public class SuperMaximumCostQueries
     {
-        public static List<int> Solve(int n, List<List<int>> tree, List<List<int>> queries)
+        private record struct Edge(int U, int V, int W)
         {
-            var sortedTree = tree.OrderBy(adj => adj[2]).ToList();
-            return queries.Select(q => PathCount(n, sortedTree, q[0], q[1])).ToList();
+            public bool IsCentral(int l, int r) => W >= l && W <= r;
+            public bool IsAllowed(int r) => W <= r;
         }
 
-        public static int PathCount(int n, List<List<int>> sortedTree, int l, int r)
+        public static List<int> Solve(List<List<int>> tree, List<List<int>> queries)
         {
-            var allowedSubtree = sortedTree.Where(adj => adj[2] >= l && adj[2] <= r).ToList();
-            var adjacencyList = TreeToAdjacencyList(allowedSubtree);
-            var connectedComponents = ConnectedComponents(adjacencyList);                    
-            var result = connectedComponents.Sum(x => ComponentPathCount(x));
-            return result;
-        }
-        
-        public static int ComponentPathCount(List<int> component)
-        {
-            int n = component.Count;
-            return n * (n - 1) / 2;
+            var edges = tree.Select(adj => new Edge(adj[0], adj[1], adj[2])).ToList();
+            var edgeAdjacencies = TreeToEdgeAdjacencies(edges);
+            return queries.Select(q => PathCount(edgeAdjacencies, q[0], q[1])).ToList();
         }
 
-        public static List<List<int>> ConnectedComponents(Dictionary<int, HashSet<int>> adjacencyList)
+        private static int PathCount(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r)
         {
-            var remainingNodes = new HashSet<int>(adjacencyList.Keys);
-            var components = new List<List<int>>(); 
-            
-            while (remainingNodes.Any())
+            var edges = edgeAdjacencies.Keys.ToList();
+            var allowedEdges = edges.Where(e => e.IsAllowed(r)).ToList();
+            //var (components, redundantCount) = ConnectedEdgeComponents(edgeAdjacencies, l, r);
+            //int count = (redundantCount + allowedEdges.Count) / 2;            
+            //var centralEdges = edges.Where(e => e.IsCentral(l, r)).ToList();
+
+            //return components.Sum(c => PathCountByEdgeComponent(c, l, r));
+            int count = allowedEdges.Sum(e => PathCountRec(edgeAdjacencies, l, r, e, null, false));
+            //int result = (redundantResult + allowedEdges.Count) / 2;
+            return count;
+        }
+
+        static Dictionary<(int l, int r, Edge edge, Edge? prev), int> _memo = new();
+        static int _countMemoUses = 0;
+        static int _stackCount = 1;
+        private static int PathCountRec(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r, Edge edge, Edge? prev, bool hasCentral)
+        {
+            _stackCount++;
+            var tuple = (l, r, edge, prev);
+            if (_memo.ContainsKey(tuple))
             {
-                var component = new List<int>();
-                var explored = new HashSet<int>();
-                var stack = new Stack<int>();
-                var firstNodeInComponent = remainingNodes.First();
-                stack.Push(firstNodeInComponent);
+                _countMemoUses++;
+                return _memo[tuple];
+            }
+
+            if (!hasCentral && edge.IsCentral(l, r))
+                hasCentral = true;
+
+            int edgeValue = hasCentral ? 1 : 0;
+            var neighbors = edgeAdjacencies[edge].Where(e => e.IsAllowed(r) && e != prev);
+            int neighborCount = 0;
+            foreach (var neighbor in neighbors)
+            {
+                neighborCount += PathCountRec(edgeAdjacencies, l, r, neighbor, edge, hasCentral);
+            }
+            _stackCount--;
+            return _memo[tuple] = neighborCount + edgeValue;
+        }
+
+        private static int PathCountByEdgeComponent(List<Edge> component, int l, int r)
+        {
+            int m = component.Count;
+            int d = component.Count(c => !c.IsCentral(l, r));
+            return (m + 1) * m / 2 - (d + 1) * d / 2;
+        }
+
+        private static (List<List<Edge>> components, int pathCount) ConnectedEdgeComponents(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r)
+        {
+            int count = 0;
+            var components = new List<List<Edge>>();
+            var edges = edgeAdjacencies.Keys.ToList();
+            var allowedEdges = edges.Where(e => e.IsAllowed(r)).ToList();
+            //var centralEdges = edgeAdjacencies.Keys.Where(e => e.IsCentral(l, r)).ToList();
+            //int centralEdgeIndex = 0;            
+            
+            foreach (var initialEdge in allowedEdges)
+            {
+                var explored = new HashSet<Edge>();
+                var stack = new Stack<Edge>();
+                //var centralEdge = centralEdges[centralEdgeIndex];
+                //if (explored.Contains(centralEdge))
+                //{
+                //    centralEdgeIndex++;
+                //    continue;
+                //}
+
+                stack.Push(initialEdge);       
+                //var component = new List<Edge>();
+                //var countBranchesFromEdge = new Dictionary<Edge, int>();
+                //int edgeCount = 0;
+                var prev = new Dictionary<Edge, Edge>();
+                var hasCentral = new Dictionary<Edge, bool>();
+                int componentCount = 0;
 
                 while (stack.Any())
-                {                    
-                    int u = stack.Pop();
-                    if (explored.Contains(u))
+                {
+                    var curr = stack.Pop();
+                    if (explored.Contains(curr))
                         continue;
-                    
-                    component.Add(u);
-                    remainingNodes.Remove(u);
 
-                    var neighbors = adjacencyList[u];
-                    foreach (var neighbor in neighbors)
+                    //edgeCount++;                                        
+
+                    //if (curr.IsCentral(l, r))
+                    //{
+                    //    countBranchesFromEdge[curr] = edgeCount;
+                    //    count += countBranchesFromEdge[curr];
+                    //}
+                    //else
+                    //{
+                    //    count += countBranchesFromEdge[prevCentral[curr]];
+                    //}                    
+
+                    //if (prev.ContainsKey(curr) && prev[curr].IsCentral(l, r))
+                    //{
+                    //    countBranchesFromEdge[prev[curr]]++;
+                    //}                   
+                    hasCentral[curr] = prev.ContainsKey(curr) ? hasCentral[prev[curr]] : curr.IsCentral(l, r);
+                    componentCount += hasCentral[curr] ? 1 : 0;
+
+                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !explored.Contains(e));
+                    foreach (var neighbor in neighborEdges)
                     {
-                        if (explored.Contains(neighbor))
-                            continue;
-
+                        prev[neighbor] = curr;
                         stack.Push(neighbor);
                     }
-                    
-                    explored.Add(u);
+
+                    explored.Add(curr);
+                    //component.Add(curr);                    
                 }
-                components.Add(component);
+                count += componentCount;
+                //centralEdgeIndex++;
+                //components.Add(component);
             }
-            return components;
+
+            return (components, count);
         }
 
-        public static Dictionary<int, HashSet<int>> TreeToAdjacencyList(List<List<int>> tree)
+        private static Dictionary<Edge, List<Edge>> TreeToEdgeAdjacencies(List<Edge> edges)
         {
-            Dictionary<int, HashSet<int>> adjList = new();
-            foreach (var adj in tree)
+            Dictionary<Edge, List<Edge>> edgeAdjacencies = edges.ToDictionary(e => e, e => new List<Edge>());
+            for (int i = 0; i < edges.Count; i++)
             {
-                int u = adj[0];
-                int v = adj[1];
-                if (!adjList.ContainsKey(u))
-                    adjList[u] = new HashSet<int>();
-                if (!adjList.ContainsKey(v))
-                    adjList[v] = new HashSet<int>();
+                Edge edge1 = edges[i];
+                int neighborCount = 0;             
 
-                adjList[u].Add(v);
-                adjList[v].Add(u);
+                for (int j = i + 1; j < edges.Count; j++)
+                {
+                    Edge edge2 = edges[j];
+                    if (edge1.U == edge2.U || edge1.U == edge2.V || edge1.V == edge2.U || edge1.V == edge2.V)
+                    {
+                        edgeAdjacencies[edge1].Add(edge2);
+                        //edgeAdjacencies[edge2].Add(edge1);
+                        neighborCount++;
+                    }
+
+                    if (neighborCount >= 2)
+                        break;
+                }
             }
-            return adjList;
-        }
 
-        public static Dictionary<int, Dictionary<int, int>> TreeToWeightedAdjacencyList(List<List<int>> tree)
-        {
-            Dictionary<int, Dictionary<int, int>> adjList = new();            
-            foreach(var adj in tree)
-            {
-                int u = adj[0];
-                int v = adj[1];
-                int w = adj[2];
-                if (!adjList.ContainsKey(u))
-                    adjList[u] = new Dictionary<int, int>();
-                if (!adjList.ContainsKey(v))
-                    adjList[v] = new Dictionary<int, int>();
-
-                adjList[u][v] = w;
-                adjList[v][u] = w;
-            }
-            return adjList;
-        }
+            return edgeAdjacencies;
+        }         
     }
 }
