@@ -31,16 +31,15 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
             int count = 0;
             var centralEdges = edgeAdjacencies.Keys.Where(e => e.IsCentral(l, r)).ToList();
             var explored = new HashSet<Edge>();
+            var initialEdges = centralEdges.Where(e => !explored.Contains(e)).ToList();
 
-            foreach (var initialEdge in centralEdges)
+            foreach (var initialEdge in initialEdges)
             {
-                if (explored.Contains(initialEdge))
-                    continue;
-
                 var stack = new Stack<Edge>();
                 stack.Push(initialEdge);
                 int edgeCount = 0;
-                var pathEdgeCounts = new Dictionary<Edge, int>();
+                var distanceToCentral = new Dictionary<Edge, int>();
+                var previousEdge = new Dictionary<Edge, Edge>();
 
                 while (stack.Any())
                 {
@@ -49,20 +48,14 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
                         continue;
 
                     edgeCount++;
-                    if (curr.IsCentral(l, r))
-                    {
-                        count += edgeCount;
-                    }
-                    else
-                    {
-                        int countConnectedCentrals = CountConnectedCentralsFrom(edgeAdjacencies, l, r, explored, curr);
-                        count += countConnectedCentrals * (edgeCount - 1);
-                    }
+                    distanceToCentral[curr] = curr.IsCentral(l, r) ? 0 : distanceToCentral[previousEdge[curr]] + 1;                    
+                    count += edgeCount - distanceToCentral[curr];
 
-                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !explored.Contains(e));
+                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !previousEdge.ContainsKey(e));
                     foreach (var neighbor in neighborEdges)
                     {
-                        stack.Push(neighbor);
+                        previousEdge[neighbor] = curr;
+                        stack.Push(neighbor);                                              
                     }
 
                     explored.Add(curr);
