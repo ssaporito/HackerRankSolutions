@@ -27,7 +27,7 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
         private static int PathCount(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r)
         {
             var edges = edgeAdjacencies.Keys.ToList();
-            var allowedEdges = edges.Where(e => e.IsAllowed(r)).ToList();
+            //var allowedEdges = edges.Where(e => e.IsAllowed(r)).ToList();
             int count = 0;
             var centralEdges = edgeAdjacencies.Keys.Where(e => e.IsCentral(l, r)).ToList();
             var explored = new HashSet<Edge>();
@@ -37,9 +37,7 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
             {
                 var stack = new Stack<Edge>();
                 stack.Push(initialEdge);
-                int edgeCount = 0;
-                var distanceToCentral = new Dictionary<Edge, int>();
-                var previousEdge = new Dictionary<Edge, Edge>();
+                int edgeCount = 0;                                
 
                 while (stack.Any())
                 {
@@ -47,14 +45,13 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
                     if (explored.Contains(curr))
                         continue;
 
-                    edgeCount++;
-                    distanceToCentral[curr] = curr.IsCentral(l, r) ? 0 : distanceToCentral[previousEdge[curr]] + 1;                    
-                    count += edgeCount - distanceToCentral[curr];
+                    edgeCount++;                
+                    var diff = curr.IsCentral(l, r) ? 0 : CountEdgesUntilCentrals(edgeAdjacencies, l, r, explored, curr);
+                    count += edgeCount - diff;
 
-                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !previousEdge.ContainsKey(e));
+                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !explored.Contains(e));
                     foreach (var neighbor in neighborEdges)
-                    {
-                        previousEdge[neighbor] = curr;
+                    {                        
                         stack.Push(neighbor);                                              
                     }
 
@@ -65,31 +62,30 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
             return count;
         }   
 
-        private static int CountConnectedCentralsFrom(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r, HashSet<Edge> explored, Edge initialEdge)
+        private static int CountEdgesUntilCentrals(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r, HashSet<Edge> explored, Edge initialEdge)
         {
             var stack = new Stack<Edge>();
             stack.Push(initialEdge);
-            int countCentrals = 0;
+            int countNonCentrals = 0;
+            var counted = new HashSet<Edge>();
 
             while (stack.Any())
             {
                 var curr = stack.Pop();
-                if (curr.IsCentral(l, r))
-                {
-                    countCentrals++;
+                if (counted.Contains(curr))
                     continue;
-                }
 
-                var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && explored.Contains(e));
+                countNonCentrals++;                
+                var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !e.IsCentral(l, r) && !counted.Contains(e) && explored.Contains(e));
                 foreach (var neighbor in neighborEdges)
                 {
                     stack.Push(neighbor);
-                }                              
+                }
 
-                explored.Add(curr);
+                counted.Add(curr);
             }
 
-            return countCentrals;
+            return countNonCentrals;
         }
 
         private static Dictionary<Edge, List<Edge>> TreeToEdgeAdjacencies(List<Edge> edges)
