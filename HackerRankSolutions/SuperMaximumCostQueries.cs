@@ -11,11 +11,11 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
 {
     public class SuperMaximumCostQueries
     {       
-        public static List<int> Solve(List<List<int>> tree, List<List<int>> queries)
+        public static List<long> Solve(int n, List<List<int>> tree, List<List<int>> queries)
         {
-            var edges = tree.Select(adj => new Edge(adj[0], adj[1], adj[2])).ToList();
-            var edgeAdjacencies = TreeToEdgeAdjacencies(edges);
-            return queries.Select(q => PathCount(edgeAdjacencies, q[0], q[1])).ToList();
+            var edges = tree.Select(adj => new Edge(adj[0] - 1, adj[1] - 1, adj[2])).ToList();
+            var adjacencies = TreeToAdjacencies(n, edges);            
+            return queries.Select(q => PathCount(edges, adjacencies, q[0], q[1])).ToList();
         }
 
         private record struct Edge(int U, int V, int W)
@@ -24,89 +24,103 @@ namespace HackerRankSolutions.SuperMaximumCostQueries
             public bool IsAllowed(int r) => W <= r;
         }
 
-        private static int PathCount(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r)
+        private static bool IsAllowed(int r, int w)
         {
-            var edges = edgeAdjacencies.Keys.ToList();
-            //var allowedEdges = edges.Where(e => e.IsAllowed(r)).ToList();
-            int count = 0;
-            var centralEdges = edgeAdjacencies.Keys.Where(e => e.IsCentral(l, r)).ToList();
-            var explored = new HashSet<Edge>();
-            var initialEdges = centralEdges.Where(e => !explored.Contains(e)).ToList();
+            return w <= r;
+        }
+        private static bool IsCentral(int l, int r, int w)
+        {
+            return w >= l && w <= r;
+        }
 
-            foreach (var initialEdge in initialEdges)
+        private static bool IsAllowedNotCentral(int l, int r, int w)
+        {
+            return w < l;
+        }
+
+        private static long PathCount(List<Edge> edges, List<List<(int node, int weight)>> adjacencies, int l, int r)
+        {            
+            long count = 0;
+            var centralNodes = edges.Where(e => e.IsCentral(l, r)).Select(e => new int[2] { e.U, e.V }).SelectMany(e => e).Distinct().ToList();
+            var explored = new HashSet<int>();            
+            var initialIndices = centralNodes;
+
+            foreach (var initialIndex in initialIndices.Where(i => !explored.Contains(i)))
             {
-                var stack = new Stack<Edge>();
-                stack.Push(initialEdge);
-                int edgeCount = 0;                                
+                var stack = new Stack<int>();
+                var prev = new Dictionary<int, (int node, int weight)>();
+
+                stack.Push(initialIndex);
+                int nodeCount = 0;
 
                 while (stack.Any())
                 {
-                    var curr = stack.Pop();
-                    if (explored.Contains(curr))
+                    var currNode = stack.Pop();
+                    if (explored.Contains(currNode))
                         continue;
 
-                    edgeCount++;                
-                    var diff = curr.IsCentral(l, r) ? 0 : CountEdgesUntilCentrals(edgeAdjacencies, l, r, explored, curr);
-                    count += edgeCount - diff;
+                    nodeCount++;
+                    if (prev.ContainsKey(currNode))
+                    {
+                        bool isCentral = IsCentral(l, r, prev[currNode].weight);
+                        var diff = isCentral ? 0 : CountEdgesUntilCentrals(adjacencies, l, r, explored, currNode);
+                        count += nodeCount - 1 - diff;
+                    }                                                            
 
-                    var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !explored.Contains(e));
-                    foreach (var neighbor in neighborEdges)
-                    {                        
-                        stack.Push(neighbor);                                              
+                    var neighbors = adjacencies[currNode].Where(t => IsAllowed(r, t.weight) && !explored.Contains(t.node)).ToList();
+                    foreach (var neighbor in neighbors)
+                    {
+                        prev[neighbor.node] = (currNode, neighbor.weight);
+                        stack.Push(neighbor.node);
                     }
 
-                    explored.Add(curr);
+                    explored.Add(currNode);
                 }
             }
 
             return count;
-        }   
+        }        
 
-        private static int CountEdgesUntilCentrals(Dictionary<Edge, List<Edge>> edgeAdjacencies, int l, int r, HashSet<Edge> explored, Edge initialEdge)
+        private static int CountEdgesUntilCentrals(List<List<(int node, int weight)>> adjacencies, int l, int r, HashSet<int> explored, int initialNode)
         {
-            var stack = new Stack<Edge>();
-            stack.Push(initialEdge);
-            int countNonCentrals = 0;
-            var counted = new HashSet<Edge>();
+            var stack = new Stack<int>();
+            stack.Push(initialNode);
+            int countNodes = 0;
+            var counted = new HashSet<int>();
+            var prev = new Dictionary<int, (int node, int weight)>();
 
             while (stack.Any())
             {
-                var curr = stack.Pop();
-                if (counted.Contains(curr))
+                var currNode = stack.Pop();
+                if (counted.Contains(currNode))
                     continue;
 
-                countNonCentrals++;                
-                var neighborEdges = edgeAdjacencies[curr].Where(e => e.IsAllowed(r) && !e.IsCentral(l, r) && !counted.Contains(e) && explored.Contains(e));
+                countNodes++;
+                var neighborEdges = adjacencies[currNode].Where(t => IsAllowedNotCentral(l, r, t.weight) && !counted.Contains(t.node) && explored.Contains(t.node)).ToList();
                 foreach (var neighbor in neighborEdges)
                 {
-                    stack.Push(neighbor);
+                    prev[neighbor.node] = (currNode, neighbor.weight);
+                    stack.Push(neighbor.node);
                 }
 
-                counted.Add(curr);
+                counted.Add(currNode);
             }
 
-            return countNonCentrals;
+            return countNodes - 1;
         }
 
-        private static Dictionary<Edge, List<Edge>> TreeToEdgeAdjacencies(List<Edge> edges)
+        private static List<List<(int node, int weight)>> TreeToAdjacencies(int n, List<Edge> edges)
         {
-            Dictionary<Edge, List<Edge>> edgeAdjacencies = edges.ToDictionary(e => e, e => new List<Edge>());
+            var adjacencies = Enumerable.Range(0, n).Select(i => new List<(int v, int w)>()).ToList();
+            //List<Dictionary<int, int>> weights = Enumerable.Range(0, n).Select(i => new Dictionary<int, int>()).ToList();
             for (int i = 0; i < edges.Count; i++)
             {
-                Edge edge1 = edges[i];            
-
-                for (int j = i + 1; j < edges.Count; j++)
-                {
-                    Edge edge2 = edges[j];
-                    if (edge1.U == edge2.U || edge1.U == edge2.V || edge1.V == edge2.U || edge1.V == edge2.V)
-                    {
-                        edgeAdjacencies[edge1].Add(edge2);
-                        edgeAdjacencies[edge2].Add(edge1);
-                    }
-                }
+                var edge = edges[i];
+                var (u, v, w) = (edge.U, edge.V, edge.W);
+                adjacencies[u].Add((v, w));
+                adjacencies[v].Add((u, w));
             }
-
-            return edgeAdjacencies;
-        }         
+            return adjacencies;
+        }    
     }
 }

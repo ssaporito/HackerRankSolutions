@@ -7,12 +7,12 @@ namespace HackerRankSolutionsTest
     {
         [Theory]
         [PlainTextData(typeof(SuperMaximumCostQueriesCaseConverter))]
-        public void TestByFiles(string treeString, string queriesString, string expectedString)
+        public void TestByFiles(int n, string treeString, string queriesString, string expectedString)
         {
             var tree = treeString.Split("\r\n").Select(line => line.Split(' ').Select(s => Convert.ToInt32(s)).ToList()).ToList();
             var queries = queriesString.Split("\r\n").Select(line => line.Split(' ').Select(s => Convert.ToInt32(s)).ToList()).ToList();
-            var expectedList = expectedString.Split("\r\n").Select(line => Convert.ToInt32(line)).ToList();
-            var actualList = SuperMaximumCostQueries.Solve(tree, queries);
+            var expectedList = expectedString.Split("\r\n").Select(line => Convert.ToInt64(line)).ToList();
+            var actualList = SuperMaximumCostQueries.Solve(n, tree, queries);
             var range = Enumerable.Range(0, expectedList.Count);
             var checks = range.Select(i => (Action)(() => Assert.Equal(expectedList[i], actualList[i]))).ToArray(); 
             Assert.Multiple(checks);            
@@ -38,7 +38,7 @@ namespace HackerRankSolutionsTest
                     sbQueries.Append((i != 0 ? "\r\n" : "") + inputStream.ReadLine().TrimEnd());
                 }
 
-                return new object[] { sbTree.ToString(), sbQueries.ToString() };
+                return new object[] { n, sbTree.ToString(), sbQueries.ToString() };
             }
 
             public override object ConvertOutput(StreamReader outputStream)
