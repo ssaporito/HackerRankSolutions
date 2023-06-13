@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <Folder Include="Cases\CountStrings\" />
+    <Folder Include="Cases\CountTriplets\" />
     <Folder Include="Cases\SuperMaximumCostQueries\" />
   </ItemGroup>
 
